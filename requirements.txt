@@ -1,0 +1,39 @@
+# --- Core orchestration / LLM ---
+groq>=0.13.0
+google-genai==1.3.0
+python-dotenv==1.0.1
+
+# --- Embeddings, sparse search, reranking ---
+sentence-transformers==3.3.1
+rank-bm25==0.2.2
+
+# --- Deep Learning & Computer Vision (CPU Optimized) ---
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2
+opencv-python
+
+# --- Vector store ---
+qdrant-client==1.12.1
+
+# --- Structured data & Parsing ---
+duckdb==1.1.3
+pandas==2.2.3
+pymupdf==1.25.1
+camelot-py==0.11.0
+
+# --- Evaluation ---
+ragas==0.2.8
+deepeval==2.1.5
+datasets==3.2.0
+langchain-google-genai==2.0.7
+langchain-huggingface==0.1.2
+
+# --- Serving & UI ---
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+streamlit==1.40.2
+pydantic==2.10.3
+
+# --- Testing ---
+pytest==8.3.4
+httpx==0.28.1

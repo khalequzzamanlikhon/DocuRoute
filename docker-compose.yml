@@ -1,0 +1,41 @@
+version: "3.9"
+
+# NOTE: Qdrant runs embedded (on-disk) by default in this project, so this
+# compose file is only needed if you want a "real" client-server deployment
+# to demo, or want Qdrant's web UI at http://localhost:6333/dashboard.
+# To use it, set QDRANT_MODE=server in .env before building.
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - QDRANT_MODE=server
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+    depends_on:
+      - qdrant
+    volumes:
+      - ./data:/app/data
+
+  frontend:
+    build: .
+    command: streamlit run frontend/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+
+volumes:
+  qdrant_data:

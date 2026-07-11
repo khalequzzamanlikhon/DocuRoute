@@ -1,0 +1,37 @@
+[
+  {
+    "id": "q001",
+    "question": "What are the main risk factors mentioned in the 2025 report?",
+    "ground_truth": "The main risks are: supply chain concentration (62% of components from a single Taiwan-based supplier), customer concentration (top 3 customers are 41% of revenue, up from 34% in 2024), regulatory risk from proposed EU environmental compliance rules ($8-12M estimated cost), and talent retention risk (engineering attrition rose to 14% from 9%).",
+    "expected_route": "unstructured",
+    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+  },
+  {
+    "id": "q002",
+    "question": "What was the average quarterly revenue over the last 3 years?",
+    "ground_truth": "$48.9 million.",
+    "expected_route": "structured",
+    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+  },
+  {
+    "id": "q003",
+    "question": "Why did revenue decline in the fourth quarter of fiscal year 2025, and by how much?",
+    "ground_truth": "Q4 2025 revenue was $49.8 million, down from $58.3 million in Q3 2025 (a decline of about $8.5 million). Management attributed this primarily to a supply chain disruption that delayed roughly $6.2 million of orders into Q1 2026, and secondarily to a one-time inventory correction by the company's largest customer.",
+    "expected_route": "both",
+    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+  },
+  {
+    "id": "q004",
+    "question": "What was the average quarterly net income over the last 3 years?",
+    "ground_truth": "$5.7 million.",
+    "expected_route": "structured",
+    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+  },
+  {
+    "id": "q005",
+    "question": "What was the company's gross margin in fiscal year 2025 compared to fiscal year 2024, and why did it change?",
+    "ground_truth": "Gross margin was 47.2% in FY2025, down from 48.9% in FY2024. The decline was due to increased component costs from the concentrated supplier base and higher freight costs incurred to expedite shipments during the Q4 supply disruption.",
+    "expected_route": "unstructured",
+    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+  }
+]
