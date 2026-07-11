@@ -1,175 +1,430 @@
-# Agentic, Query-Routing RAG System
+<div align="center">
 
-A research-assistant RAG system that routes questions to the right retrieval
-strategy — semantic search over document text, or a text-to-SQL agent against
-extracted tables — and measures its own retrieval/generation quality with
-Ragas + a DeepEval CI gate.
+# 🔎 DocuRoute
+
+### Agentic, Query-Routing RAG System for Financial Document Intelligence
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.40-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Groq](https://img.shields.io/badge/LLM-Groq%20%2F%20Gemini-orange?style=flat)](https://console.groq.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**DocuRoute** is a production-grade Retrieval-Augmented Generation (RAG) system
+that intelligently routes financial questions to the right retrieval strategy —
+semantic search over document text, or a text-to-SQL agent against extracted
+tables — and measures its own quality with a full evaluation pipeline.
+
+[Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Usage](#usage) · [Evaluation](#evaluation) · [Roadmap](#roadmap)
+
+</div>
+
+---
+
+## Demo
+
+> **Add your demo here.**
+> Record a short screen capture (10–30 seconds) showing a question being asked
+> in the Streamlit UI and the answer appearing with citations.
+> Tools: [ScreenToGif](https://www.screentogif.com/) (Windows) · [Kap](https://getkap.co/) (macOS)
+> Convert to `.gif` and replace the placeholder below.
+
+```
+[ demo.gif ]
+```
+
+---
+
+## Features
+
+| Feature | Description |
+|---|---|
+| **Intelligent Query Routing** | LLM classifies each question as `unstructured`, `structured`, or `both` based on actual table schemas discovered at ingest time — not keyword rules |
+| **Hybrid Retrieval** | BM25 keyword search + dense vector search (BGE), fused with Reciprocal Rank Fusion (RRF) — catches both exact terms and semantic meaning |
+| **Cross-Encoder Reranking** | Second-pass reranker reads (query, chunk) jointly before handing context to the LLM, eliminating "similar but not relevant" results |
+| **Text-to-SQL Agent** | Generates and safely executes SQL against tables extracted from PDFs — sandboxed with read-only DuckDB, keyword denylist, and row cap |
+| **Grounded Generation** | Every factual sentence in an answer carries a `[C_n]` / `[T_n]` citation back to the specific chunk or SQL result that produced it |
+| **Provider Fallback** | Groq (Llama 3.3 70B) is the primary LLM. On rate-limit, automatically falls back to Gemini 2.5 Flash — invisible to the user |
+| **Evaluation Harness** | Ragas computes Context Precision, Context Recall, Faithfulness, Answer Relevancy against a golden set; DeepEval runs the same as a CI gate |
+
+---
 
 ## Architecture
 
 ```
-User Query
-    │
-    ▼
-Query Router (LLM classifier, grounded in real table schemas)
-    │
-    ├── unstructured ──► Query Rewriter ──► Hybrid Retrieval (BM25 + Vector, RRF) ──► Reranker ──► Context
-    │
-    └── structured    ──► Text-to-SQL Agent ──► Sandboxed DuckDB Execution ──► Result
-    │
-    ▼
-Grounded Synthesizer (must cite [C_n]/[T_n], refuses below confidence threshold)
-    │
-    ▼
-Answer + Citations
+                          ┌─────────────────────────┐
+                          │       User Question      │
+                          └────────────┬────────────┘
+                                       │
+                          ┌────────────▼────────────┐
+                          │   LLM Query Router       │
+                          │  (grounded in real table │
+                          │   schemas from DuckDB)   │
+                          └──────┬──────────┬────────┘
+                                 │          │
+               ┌─────────────────▼──┐  ┌───▼──────────────────┐
+               │   UNSTRUCTURED     │  │    STRUCTURED         │
+               │   TEXT PATH        │  │    TABLE PATH         │
+               │                    │  │                       │
+               │ Query Rewriter     │  │ Text-to-SQL Agent     │
+               │       ↓            │  │       ↓               │
+               │ Hybrid Retrieval   │  │ Sandboxed DuckDB      │
+               │ (BM25 + Vector,    │  │ Execution             │
+               │  RRF fusion)       │  │ (read-only, denylisted│
+               │       ↓            │  │  row-capped)          │
+               │ Cross-Encoder      │  │       ↓               │
+               │ Reranker           │  │ Structured Result     │
+               └────────┬───────────┘  └───────────┬───────────┘
+                        │                           │
+                        └────────────┬──────────────┘
+                                     │
+                        ┌────────────▼────────────┐
+                        │  Grounded Synthesizer    │
+                        │  (refuses below          │
+                        │   confidence threshold)  │
+                        └────────────┬────────────┘
+                                     │
+                        ┌────────────▼────────────┐
+                        │  Answer + [C_n]/[T_n]    │
+                        │  Citations               │
+                        └─────────────────────────┘
 ```
 
-## Why these design choices
+### Technology Stack
 
-| Decision | Reasoning |
-|---|---|
-| RRF over score-weighted fusion | BM25 and cosine similarity live on incomparable scales; RRF fuses on **rank**, sidestepping the scale mismatch. |
-| Cross-encoder rerank as a separate stage | Bi-encoder retrieval scores are computed independently per document; a cross-encoder reads (query, chunk) jointly, which is what actually fixes "similar but not relevant" results. |
-| Open-source embedder + reranker (BGE) by default | The pipeline design is the point, not which embedding API you pay for. Swappable via `.env` (`EMBEDDING_MODEL`, `RERANKER_MODEL`). |
-| Qdrant in embedded/local mode by default | No Docker required to run the whole thing locally; `docker-compose.yml` is there when you want a real client-server demo. |
-| DuckDB, `read_only=True` connection + SQL denylist + row cap | Defense in depth: the read-only flag is the actual security boundary; the regex denylist and row cap catch injection attempts and runaway queries early with clear errors. |
-| Ragas for dev-loop metrics, DeepEval for CI | Ragas is fast to iterate with locally; DeepEval turns the same four metrics into an automated pass/fail gate you can put in GitHub Actions. |
+| Layer | Technology | Why |
+|---|---|---|
+| **Primary LLM** | Groq — Llama 3.3 70B | Free tier, 14,400 req/day, GPT-4 class quality |
+| **Fallback LLM** | Gemini 2.5 Flash | Auto-fallback on Groq rate-limit |
+| **Embeddings** | BGE-small-en-v1.5 (local) | Runs on CPU, no API key, no cost per query |
+| **Reranker** | BGE-reranker-base (local) | Cross-encoder accuracy, runs locally |
+| **Vector Store** | Qdrant (embedded mode) | On-disk, no Docker required for local dev |
+| **Keyword Search** | BM25 via rank-bm25 | Catches exact terms embeddings miss |
+| **Structured Store** | DuckDB | Zero-setup, embeds in-process, fast analytics |
+| **PDF Text** | PyMuPDF | Fast, accurate page-level text extraction |
+| **PDF Tables** | Camelot | Grid-aware table extraction, preserves structure |
+| **API** | FastAPI | Clean REST layer, auto-generated Swagger docs |
+| **UI** | Streamlit | Rapid demo interface |
+| **Evaluation** | Ragas + DeepEval | LLM-as-judge metrics + CI regression gate |
 
-## Setup
+---
+
+## Project Structure
+
+```
+DocuRoute/
+│
+├── api/
+│   ├── __init__.py
+│   └── main.py                  # FastAPI app — /query, /health, /debug/tables
+│
+├── data/
+│   ├── raw/                     # ← drop your PDFs here
+│   │   └── .gitkeep
+│   └── processed/               # auto-generated by ingest.py, git-ignored
+│       ├── qdrant_storage/      # vector index (on-disk Qdrant)
+│       ├── bm25_index.pkl       # serialised BM25 index
+│       └── tables.duckdb        # extracted financial tables
+│
+├── evaluation/
+│   ├── results/                 # versioned eval run CSVs, git-ignored
+│   ├── golden_set.json          # your ground-truth Q&A pairs ← edit this
+│   ├── metrics.py               # Ragas metric wiring (Groq as judge)
+│   ├── run_eval.py              # versioned before/after eval runner
+│   └── run_deepeval_ci.py       # CI pass/fail gate
+│
+├── frontend/
+│   └── app.py                   # Streamlit demo UI
+│
+├── generation/
+│   ├── __init__.py
+│   ├── prompts/
+│   │   └── synthesis_prompt.txt # grounded generation system prompt
+│   └── synthesizer.py           # grounded answer + citation extraction
+│
+├── ingestion/
+│   ├── __init__.py
+│   ├── chunking.py              # recursive overlap-aware text chunking
+│   ├── index_builder.py         # Qdrant + DuckDB population
+│   └── loaders.py               # PyMuPDF text + Camelot table extraction
+│
+├── retrieval/
+│   ├── __init__.py
+│   ├── hybrid_retriever.py      # BM25 + vector + RRF fusion
+│   ├── query_rewriter.py        # LLM query rewriting + multi-query expansion
+│   ├── reranker.py              # cross-encoder rerank + confidence gate
+│   └── router.py                # LLM query classifier
+│
+├── sql_agent/
+│   ├── __init__.py
+│   ├── executor.py              # sandboxed read-only DuckDB execution
+│   └── text_to_sql.py           # NL → SQL grounded in real schema
+│
+├── tests/
+│   ├── test_chunking.py         # chunking unit tests
+│   └── test_sql_executor.py     # SQL sandbox security tests
+│
+├── .env.example                 # environment variable template
+├── .github/
+│   └── workflows/
+│       └── eval-gate.yml        # CI: unit tests + DeepEval regression gate
+├── .gitignore
+├── config.py                    # single source of truth for all settings
+├── docker-compose.yml           # optional: Qdrant server + API + frontend
+├── Dockerfile
+├── generate_synthetic_pdf.py    # generates aurora_dynamics demo PDF
+├── ingest.py                    # CLI: PDFs → vector + BM25 + DuckDB indices
+├── llm_client.py                # Groq primary / Gemini fallback LLM wrapper
+├── pipeline.py                  # orchestrator tying all components together
+└── requirements.txt
+```
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- [Ghostscript](https://www.ghostscript.com/releases/gsdnld.html) — required for PDF table extraction
+  - Windows: download and run the installer from the link above
+  - macOS: `brew install ghostscript`
+  - Linux: `sudo apt-get install ghostscript`
+
+### Installation
 
 ```bash
-git clone <this-repo>
-cd agentic-rag
-python -m venv .venv && source .venv/bin/activate
+# 1. Clone the repository
+git clone https://github.com/yourusername/DocuRoute.git
+cd DocuRoute
+
+# 2. Create and activate a virtual environment
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
+# 3. Install CPU-only PyTorch first (avoids a 4 GB CUDA download on machines without GPU)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# 4. Install all dependencies
 pip install -r requirements.txt
-cp .env.example .env   # fill in GEMINI_API_KEY
+
+# 5. Copy the environment template
+copy .env.example .env        # Windows
+cp .env.example .env          # macOS / Linux
 ```
 
-System dependency for table extraction: `apt-get install ghostscript` (Linux) or `brew install ghostscript` (macOS).
+---
 
-## Running it
+## Configuration
+
+Open `.env` and fill in your API keys:
+
+```env
+# ── PRIMARY LLM: Groq ────────────────────────────────────────────────────
+# Free key (no card needed): https://console.groq.com → API Keys → Create
+# Free tier: 14,400 requests/day
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GROQ_MODEL=llama-3.3-70b-versatile
+
+# ── FALLBACK LLM: Gemini ─────────────────────────────────────────────────
+# Free key: https://aistudio.google.com/apikey
+# Used automatically when Groq hits its rate limit
+GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LLM_MODEL=gemini-2.5-flash
+
+# ── Retrieval tuning (safe to leave as defaults) ──────────────────────────
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+RERANKER_MODEL=BAAI/bge-reranker-base
+TOP_K_DENSE=20
+TOP_K_SPARSE=20
+TOP_K_FUSED=10
+TOP_K_FINAL=5
+
+# ── Storage paths ─────────────────────────────────────────────────────────
+DUCKDB_PATH=./data/processed/tables.duckdb
+QDRANT_STORAGE_PATH=./data/processed/qdrant_storage
+```
+
+> **You only need both keys if you want automatic fallback.**
+> The system works with just `GROQ_API_KEY`. Gemini is only called when Groq
+> returns a 429 rate-limit error.
+
+---
+
+## Usage
+
+### Step 1 — Add your documents
+
+Drop PDF files into `data/raw/`. The system works best with 3–5 years of
+annual reports (10-K filings) for a single company. Download free from
+[sec.gov/edgar/search](https://www.sec.gov/edgar/search/).
+
+Name them descriptively — the filename (minus extension) becomes the `doc_id`
+shown in citations:
+
+```
+data/raw/etsy_10k_2023.pdf
+data/raw/etsy_10k_2024.pdf
+data/raw/etsy_10k_2025.pdf
+```
+
+A synthetic demo document (`aurora_dynamics_10k_2025.pdf`) is included so
+you can verify the pipeline works before obtaining real filings.
+
+### Step 2 — Run ingestion
 
 ```bash
-# 1. Drop PDFs into data/raw/, then build the indices
 python ingest.py
-
-# 2. Start the API
-uvicorn api.main:app --reload --port 8000
-
-# 3. In another terminal, start the demo UI
-streamlit run frontend/app.py
-
-# or just curl it:
-curl -X POST localhost:8000/query -H "Content-Type: application/json" \
-     -d '{"question": "What was the average quarterly revenue for the last 3 years?"}'
 ```
 
-## Building your golden set
+This extracts text and tables from every PDF in `data/raw/`, builds the
+vector index, BM25 index, and DuckDB structured tables. Re-run this command
+whenever you add or change documents.
 
-`evaluation/golden_set.json` ships with 3 placeholder rows — **replace them and
-grow to 30-50 real question/answer pairs before your eval numbers mean
-anything.** Write the `ground_truth` yourself by reading the source
-documents; don't generate it with the same model you're evaluating, or
-you're grading your own homework.
+Verify what tables were extracted:
+```
+http://localhost:8000/debug/tables
+```
+
+### Step 3 — Start the API
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+Check the API is alive:
+```bash
+curl http://localhost:8000/health
+```
+
+Interactive API docs (Swagger UI):
+```
+http://localhost:8000/docs
+```
+
+### Step 4 — Start the UI (optional, separate terminal)
+
+```bash
+streamlit run frontend/app.py
+```
+
+Open in browser:
+```
+http://localhost:8501
+```
+
+> The Streamlit UI and the Swagger docs both talk to the same FastAPI backend.
+> Keep the `uvicorn` terminal running while using either interface.
+
+---
 
 ## Scope — what this system can and can't answer
 
-**This is not a general chatbot.** It only knows what's in the PDFs you put in
-`data/raw/` and ran through `python ingest.py`. If you ingest Etsy's 2023-2025
-10-Ks, it can answer questions about Etsy's business, risks, and financials
-from those filings — nothing else. It has no access to today's stock price,
-news, or any company/document you haven't ingested.
+**This is not a general chatbot.** It only answers questions about the PDFs
+you have ingested. With Etsy's 2023–2025 10-Ks loaded, it can answer
+questions about Etsy's business, risks, and financials from those filings.
+It has no access to live stock prices, news, or any document you haven't
+ingested.
 
-Every answer is grounded in retrieved text or an executed SQL query, and every
-factual sentence carries a `[C_n]`/`[T_n]` citation back to the specific chunk
-or query that produced it. If the system can't find enough relevant material,
-it says so explicitly rather than guessing — check `/debug/tables` after
-ingestion to see exactly what structured data it has to work with.
+### Example questions
 
-## Example questions (adapt these to whatever you've ingested)
+**Unstructured** — pure narrative retrieval:
+```
+What are the main risk factors related to competition?
+How does management describe Etsy's international growth strategy?
+What does the company say about seller trust and safety?
+```
 
-Once you've skimmed the actual filings, write real questions like these —
-mix all three route types so you can demonstrate the router actually works:
+**Structured** — SQL against extracted tables:
+```
+What was total revenue in fiscal year 2024?
+What was net income across 2023, 2024, and 2025?
+Which year had the highest income from operations?
+```
 
-**Unstructured** (pure narrative, no tables involved):
-- "What are the main risk factors related to competition?"
-- "What does management say about seller/buyer trust and safety?"
-- "How does the company describe its growth strategy for international markets?"
+**Both** — number + narrative explanation (strongest routing demo):
+```
+Why did operating margin change between 2023 and 2024, and by how much?
+What drove the change in active buyers, and what was the actual count?
+```
 
-**Structured** (pure number, answerable by SQL alone):
-- "What was total revenue in fiscal year 2024?"
-- "What was the year-over-year change in gross merchandise sales?"
-- "What was the average quarterly marketing spend across the filings?"
+---
 
-**Both** (needs a number AND the narrative explaining it — the strongest demo of routing):
-- "Why did operating margin change between 2023 and 2024, and by how much?"
-- "What drove the change in active buyers, and what was the actual number?"
+## Evaluation
 
-Write 30-50 of these into `evaluation/golden_set.json` with real ground-truth
-answers you compute/read yourself — that's what the eval numbers in your
-README will be based on.
+DocuRoute measures its own retrieval and generation quality with four
+standard RAG metrics computed by Ragas (using the same LLM as judge):
 
-## Eval workflow (this is the point of the whole project)
+| Metric | Measures |
+|---|---|
+| **Context Precision** | Of everything retrieved, how much was actually relevant? |
+| **Context Recall** | Of everything relevant, how much did we retrieve? |
+| **Faithfulness** | Does the answer only state things the retrieved context supports? |
+| **Answer Relevancy** | Does the answer actually address the question asked? |
+
+### Run an evaluation
 
 ```bash
-# Run against your current pipeline configuration and tag the result
+# Edit evaluation/golden_set.json with real Q&A pairs first
 python evaluation/run_eval.py --version baseline_vector_only
-
-# ... add hybrid search / reranking / query rewriting in the code ...
-
-python evaluation/run_eval.py --version hybrid_rrf_rerank
 ```
 
-Every run appends a row to `evaluation/results/history.csv`. That table is
-the before/after artifact for the README:
+Results are appended to `evaluation/results/history.csv`. Run again after
+pipeline changes to build a before/after comparison table:
 
-| version | context_precision | context_recall | faithfulness | answer_relevancy |
+| Version | Context Precision | Context Recall | Faithfulness | Answer Relevancy |
 |---|---|---|---|---|
-| baseline_vector_only | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
-| hybrid_rrf | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
-| hybrid_rrf_rerank | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
-| + query_rewriting | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
+| baseline_vector_only | — | — | — | — |
+| hybrid_rrf | — | — | — | — |
+| hybrid_rrf_rerank | — | — | — | — |
 
-Run `python evaluation/run_deepeval_ci.py` to apply the same metrics as a
-hard pass/fail gate — this is what's wired into `.github/workflows/eval-gate.yml`.
+### CI regression gate
 
-## Project structure
-
-```
-agentic-rag/
-├── config.py                 # single source of truth for all settings
-├── llm_client.py              # Gemini wrapper (used by router/rewriter/sql/synthesis)
-├── pipeline.py                 # orchestrator: router -> retrieval/sql -> synthesis
-├── ingest.py                   # CLI: PDFs -> vector index + BM25 + DuckDB
-├── ingestion/
-│   ├── loaders.py               # PDF text + table extraction (pymupdf + camelot)
-│   ├── chunking.py               # recursive, overlap-aware chunking
-│   └── index_builder.py          # Qdrant + DuckDB population
-├── retrieval/
-│   ├── router.py                  # LLM query classifier (structured/unstructured/both)
-│   ├── query_rewriter.py           # query rewriting + multi-query variants
-│   ├── hybrid_retriever.py          # BM25 + vector, fused with RRF
-│   └── reranker.py                  # cross-encoder rerank + confidence gate
-├── sql_agent/
-│   ├── text_to_sql.py                # NL -> SQL, grounded in real schema
-│   └── executor.py                    # sandboxed, read-only, denylisted execution
-├── generation/
-│   ├── synthesizer.py                  # grounded generation with [C_n]/[T_n] citations
-│   └── prompts/synthesis_prompt.txt
-├── evaluation/
-│   ├── golden_set.json                  # your ground-truth Q&A set
-│   ├── metrics.py                        # Ragas metric wiring
-│   ├── run_eval.py                        # versioned before/after eval runs
-│   └── run_deepeval_ci.py                  # CI pass/fail gate
-├── api/main.py                              # FastAPI /query endpoint
-├── frontend/app.py                           # Streamlit demo
-├── tests/                                    # pytest — chunking + SQL sandboxing
-└── .github/workflows/eval-gate.yml            # CI: unit tests + eval gate
+```bash
+python evaluation/run_deepeval_ci.py
 ```
 
-## What I'd do with more time
+Returns exit code `0` (pass) or `1` (fail). Wired into
+`.github/workflows/eval-gate.yml` — runs on every push to `main` and
+blocks merges if Faithfulness or Answer Relevancy drop below threshold.
 
-- Fine-tune the reranker on the golden set's hard negatives instead of using it off-the-shelf.
-- Add multi-hop retrieval for questions that need chaining two lookups (e.g., "compare this year's biggest risk to last year's").
-- Add per-component latency tracing (Arize Phoenix) surfaced in the Streamlit UI, not just in logs.
-- Cache query embeddings and rewritten variants (many repeated/similar questions in real usage).
+---
+
+## Design Decisions
+
+| Decision | Reasoning |
+|---|---|
+| **RRF over score-weighted fusion** | BM25 scores and cosine similarities live on incomparable scales. RRF fuses on rank, not score, sidestepping the calibration problem entirely |
+| **Cross-encoder reranker as a separate stage** | Bi-encoder retrieval scores query and document independently. A cross-encoder reads the pair jointly — much more accurate, but too slow to run on the full corpus, so it runs only on the top fused candidates |
+| **Open-source embedder + reranker (BGE)** | The pipeline design is the point, not which embedding API you pay for. Runs on CPU, zero cost per query, fully reproducible |
+| **Qdrant embedded mode by default** | No Docker required to run locally. `docker-compose.yml` adds a real client-server deployment when needed for a demo |
+| **DuckDB read-only + keyword denylist + row cap** | Defense in depth: `read_only=True` is the real security boundary; the regex denylist catches injection attempts early with a clear error; the row cap prevents runaway aggregations from blocking the API |
+| **Groq primary / Gemini fallback** | Groq gives 14,400 free requests/day for development. Gemini activates silently on rate-limit. The architecture is provider-agnostic — swapping both is a one-file change in `llm_client.py` |
+
+---
+
+## Roadmap
+
+- [ ] Fine-tune the reranker on the golden set's hard negatives
+- [ ] Add multi-hop retrieval for questions requiring two linked lookups
+- [ ] Per-component latency tracing via Arize Phoenix surfaced in the UI
+- [ ] Query result caching to reduce LLM calls on repeated/similar questions
+- [ ] Streaming responses in the Streamlit UI
+- [ ] Support for HTML filings directly from EDGAR (skip Print-to-PDF step)
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+Built as a portfolio project demonstrating production ML engineering practices:<br>
+hybrid retrieval · agentic routing · grounded generation · automated evaluation
+</div>
