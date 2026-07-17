@@ -23,12 +23,6 @@ tables — and measures its own quality with a full evaluation pipeline.
 
 ## Demo
 
-> **Add your demo here.**
-> Record a short screen capture (10–30 seconds) showing a question being asked
-> in the Streamlit UI and the answer appearing with citations.
-> Tools: [ScreenToGif](https://www.screentogif.com/) (Windows) · [Kap](https://getkap.co/) (macOS)
-> Convert to `.gif` and replace the placeholder below.
-
 ```
 [ demo.gif ]
 ```
