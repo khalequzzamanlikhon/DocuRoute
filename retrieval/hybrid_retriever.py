@@ -66,12 +66,13 @@ class HybridRetriever:
 
     def _dense_search(self, query: str, top_k: int) -> list[tuple[str, float]]:
         vec = self.embedder.encode(query, normalize_embeddings=True).tolist()
-        hits = self.client.search(
+        # qdrant-client >= 1.7 replaced .search() with .query_points()
+        result = self.client.query_points(
             collection_name=settings.qdrant_collection,
-            query_vector=vec,
+            query=vec,
             limit=top_k,
         )
-        return [(h.payload["chunk_id"], h.score) for h in hits]
+        return [(h.payload["chunk_id"], h.score) for h in result.points]
 
     def _sparse_search(self, query: str, top_k: int) -> list[tuple[str, float]]:
         if self._bm25 is None:
