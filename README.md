@@ -24,7 +24,7 @@ tables — and measures its own quality with a full evaluation pipeline.
 ## Demo
 
 ```
-[ demo.gif ]
+![DocuRoute Application Demo](demo.gif)
 ```
 
 ---
