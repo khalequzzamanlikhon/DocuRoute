@@ -1,37 +1,77 @@
 [
   {
     "id": "q001",
-    "question": "What are the main risk factors mentioned in the 2025 report?",
-    "ground_truth": "The main risks are: supply chain concentration (62% of components from a single Taiwan-based supplier), customer concentration (top 3 customers are 41% of revenue, up from 34% in 2024), regulatory risk from proposed EU environmental compliance rules ($8-12M estimated cost), and talent retention risk (engineering attrition rose to 14% from 9%).",
-    "expected_route": "unstructured",
-    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+    "question": "What are the primary risk factors related to competition that Etsy describes in its 2025 annual report?",
+    "ground_truth": "Etsy identifies intense competition from a diverse array of online and offline retailers and marketplaces that compete for both buyers and sellers [1]. Key competitive factors include the uniqueness and quality of items, the effectiveness of search technology, brand trust, and the overall customer experience, including shipping costs and mobile app functionality [1]. Many of Etsy's competitors have longer operating histories and significantly greater financial and marketing resources [1, 2]."
   },
   {
     "id": "q002",
-    "question": "What was the average quarterly revenue over the last 3 years?",
-    "ground_truth": "$48.9 million.",
-    "expected_route": "structured",
-    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+    "question": "How does Etsy describe its business model and what makes its marketplace unique according to the 2025 annual report?",
+    "ground_truth": "Etsy operates an asset-light, two-sided online marketplace model that connects creative entrepreneurs with global buyers without holding physical inventory [3, 4]. The marketplace is unique due to its 'Right to Win' strategy, which focuses on four core pillars: sellers' unique and often personalized items, best-in-class search and discovery, authentic human connections, and a trusted brand [5]. This creates a 'virtuous circle' where transaction fees are reinvested into technology and marketing to drive further growth for both Etsy and its sellers [4]."
   },
   {
     "id": "q003",
-    "question": "Why did revenue decline in the fourth quarter of fiscal year 2025, and by how much?",
-    "ground_truth": "Q4 2025 revenue was $49.8 million, down from $58.3 million in Q3 2025 (a decline of about $8.5 million). Management attributed this primarily to a supply chain disruption that delayed roughly $6.2 million of orders into Q1 2026, and secondarily to a one-time inventory correction by the company's largest customer.",
-    "expected_route": "both",
-    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+    "question": "What does management say about macroeconomic conditions and their effect on Etsy's business in the 2025 report?",
+    "ground_truth": "Management describes a 'persistently dynamic macroeconomic environment' that has placed ongoing pressure on consumer discretionary spending and led to evolving buyer behavior [6]. These conditions contributed to a 4% year-over-year decline in Etsy marketplace GMS to $10.5 billion [6]. Despite these headwinds, management noted that strategic initiatives helped improve performance momentum as the year progressed [6, 7]."
   },
   {
     "id": "q004",
-    "question": "What was the average quarterly net income over the last 3 years?",
-    "ground_truth": "$5.7 million.",
-    "expected_route": "structured",
-    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+    "question": "What are the key risks Etsy identifies related to its dependence on third-party platforms such as Google and social media?",
+    "ground_truth": "Etsy identifies significant risk in its reliance on search engines like Google, where algorithm changes can negatively impact site traffic, placement, and marketing efficiency [8]. They also depend on third-party platforms for user engagement and mobile app distribution, meaning any restrictive changes by these providers could curtail access to Etsy's marketplaces [8]. Furthermore, shifts in the policies or costs of these external channels can increase advertising expenses or reduce the overall effectiveness of buyer acquisition efforts [9]."
   },
   {
     "id": "q005",
-    "question": "What was the company's gross margin in fiscal year 2025 compared to fiscal year 2024, and why did it change?",
-    "ground_truth": "Gross margin was 47.2% in FY2025, down from 48.9% in FY2024. The decline was due to increased component costs from the concentrated supplier base and higher freight costs incurred to expedite shipments during the Q4 supply disruption.",
-    "expected_route": "unstructured",
-    "reference_doc_ids": ["aurora_dynamics_10k_2025"]
+    "question": "How does Etsy describe its strategy for growing its active buyer base in the 2024 annual report?",
+    "ground_truth": "In 2024, Etsy focused on driving growth by increasing purchase frequency and tapping into new categories like gifting [10]. The company heavily invested in reactivating lapsed buyers—successfully bringing back nearly 29 million people during the year—while emphasizing its mobile app as a key tool for higher conversion and lifetime value [11, 12]. Additionally, they aimed to deepen buyer loyalty by highlighting quality listings and strengthening the human connections inherent in their 'Right to Win' strategy [11, 13]."
+  },
+  {
+    "id": "q006",
+    "question": "What was Etsy's total revenue for fiscal year 2025?",
+    "ground_truth": "Etsy's total revenue for fiscal year 2025 was $2,883.5 million [14]."
+  },
+  {
+    "id": "q007",
+    "question": "What was Etsy's net income or net loss for fiscal year 2024?",
+    "ground_truth": "Etsy reported net income of $303.3 million for fiscal year 2024 [14, 15]."
+  },
+  {
+    "id": "q008",
+    "question": "What was Etsy's total revenue across all three years 2023, 2024, and 2025?",
+    "ground_truth": "Based on the 2025 Consolidated Statements of Operations, Etsy's total revenue was $2,748.4 million in 2023, $2,808.3 million in 2024, and $2,883.5 million in 2025 [14]."
+  },
+  {
+    "id": "q009",
+    "question": "What was Etsy's gross profit for fiscal year 2025?",
+    "ground_truth": "Etsy's gross profit for fiscal year 2025 was $2,065.7 million [14]."
+  },
+  {
+    "id": "q010",
+    "question": "What was Etsy's total operating expenses for fiscal year 2023?",
+    "ground_truth": "Etsy's total operating expenses for fiscal year 2023 were $1,639.9 million [15, 16]."
+  },
+  {
+    "id": "q011",
+    "question": "Why did Etsy's revenue change between 2024 and 2025, and what was the exact dollar amount of the change?",
+    "ground_truth": "Etsy's revenue increased by $75.2 million (2.7%) between 2024 and 2025 [17]. Management attributed this growth primarily to improvements in the Etsy Ads product, which enhanced relevancy and efficiency through machine learning optimizations, as well as an 11.3% increase in Services revenue [17, 18]."
+  },
+  {
+    "id": "q012",
+    "question": "What drove the change in Etsy's marketing expenses between 2023 and 2024, and by how much did they change?",
+    "ground_truth": "Marketing expenses increased by $97.4 million (12.8%), from $759.2 million in 2023 to $856.6 million in 2024 [19]. This change was driven by increased performance marketing costs as the company invested in high-ROI digital channels and expanded brand marketing campaigns, particularly for the Depop marketplace [19]."
+  },
+  {
+    "id": "q013",
+    "question": "How did Etsy's gross margin trend across 2023, 2024, and 2025, and what factors does management attribute this to?",
+    "ground_truth": "Etsy's gross margin trended from 69.8% in 2023 up to 72.4% in 2024, before settling at 71.6% in 2025 [20-22]. Management attributed the 2024 gain to lower refund costs and hosting efficiencies, while the 2025 decrease was primarily due to higher cloud-related hosting costs and investments in the Etsy Insider loyalty program [21, 22]."
+  },
+  {
+    "id": "q014",
+    "question": "What was Etsy's stock-based compensation expense in 2025, and why does management consider it significant?",
+    "ground_truth": "Etsy's stock-based compensation expense in 2025 was $245.5 million [23]. Management considers this significant because it is a material non-cash expense that involves highly subjective accounting estimates and is a core part of their strategy to attract and retain talent [24-26]."
+  },
+  {
+    "id": "q015",
+    "question": "What was the year-over-year change in Etsy's research and development expenses between 2024 and 2025, and what is the company investing in?",
+    "ground_truth": "Product development (Etsy's equivalent for R&D) expenses increased by $7.1 million, from $443.1 million in 2024 to $450.2 million in 2025 [14]. The company is heavily investing in machine learning to re-architect its search and recommendation systems, aiming to improve relevance and better understand buyer intent [5]."
   }
 ]
