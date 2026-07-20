@@ -38,7 +38,7 @@ tables — and measures its own quality with a full evaluation pipeline.
 | **Cross-Encoder Reranking** | Second-pass reranker reads (query, chunk) jointly before handing context to the LLM, eliminating "similar but not relevant" results |
 | **Text-to-SQL Agent** | Generates and safely executes SQL against tables extracted from PDFs — sandboxed with read-only DuckDB, keyword denylist, and row cap |
 | **Grounded Generation** | Every factual sentence in an answer carries a `[C_n]` / `[T_n]` citation back to the specific chunk or SQL result that produced it |
-| **Provider Fallback** | Groq (Llama 3.3 70B) is the primary LLM. On rate-limit, automatically falls back to Gemini 2.5 Flash — invisible to the user |
+| **Provider Fallback** | Groq (primary) → OpenRouter (secondary) → Gemini (tertiary fallback). On rate-limit, automatically drops to the next provider — invisible to the user |
 | **Evaluation Harness** | Ragas computes Context Precision, Context Recall, Faithfulness, Answer Relevancy against a golden set; DeepEval runs the same as a CI gate |
 
 ---
@@ -89,7 +89,8 @@ tables — and measures its own quality with a full evaluation pipeline.
 | Layer | Technology | Why |
 |---|---|---|
 | **Primary LLM** | Groq — Llama 3.3 70B | Free tier, 14,400 req/day, GPT-4 class quality |
-| **Fallback LLM** | Gemini 2.5 Flash | Auto-fallback on Groq rate-limit |
+| **Secondary LLM** | OpenRouter — Llama 3.3 70B | Auto-fallback on Groq rate-limit, higher quota |
+| **Fallback LLM** | Gemini 2.5 Flash | Auto-fallback when both Groq and OpenRouter are exhausted |
 | **Embeddings** | BGE-small-en-v1.5 (local) | Runs on CPU, no API key, no cost per query |
 | **Reranker** | BGE-reranker-base (local) | Cross-encoder accuracy, runs locally |
 | **Vector Store** | Qdrant (embedded mode) | On-disk, no Docker required for local dev |
@@ -397,7 +398,7 @@ blocks merges if Faithfulness or Answer Relevancy drop below threshold.
 | **Open-source embedder + reranker (BGE)** | The pipeline design is the point, not which embedding API you pay for. Runs on CPU, zero cost per query, fully reproducible |
 | **Qdrant embedded mode by default** | No Docker required to run locally. `docker-compose.yml` adds a real client-server deployment when needed for a demo |
 | **DuckDB read-only + keyword denylist + row cap** | Defense in depth: `read_only=True` is the real security boundary; the regex denylist catches injection attempts early with a clear error; the row cap prevents runaway aggregations from blocking the API |
-| **Groq primary / Gemini fallback** | Groq gives 14,400 free requests/day for development. Gemini activates silently on rate-limit. The architecture is provider-agnostic — swapping both is a one-file change in `llm_client.py` |
+| **Groq primary / OpenRouter secondary / Gemini fallback** | Groq gives 14,400 free requests/day for development. OpenRouter (with its own free credits) steps in when Groq rate-limits — much higher quota before hitting Gemini. Gemini is the last resort when both are exhausted. The architecture is provider-agnostic — swapping any provider is a one-file change in `llm_client.py` |
 
 ---
 

@@ -1,13 +1,13 @@
-"""
-LLM client with automatic provider fallback:
+"""LLM client with automatic provider fallback:
 
-  PRIMARY  → Groq (llama-3.3-70b-versatile) — free, 14,400 req/day
-  FALLBACK → Gemini 2.5 Flash               — kicks in on Groq 429
+  PRIMARY   → Groq (llama-3.3-70b-versatile)       — free, 14,400 req/day
+  SECONDARY → OpenRouter (meta-llama/llama-3.3-70b) — kicks in on Groq 429
+  FALLBACK  → Gemini 2.5 Flash                       — when both Groq & OR are exhausted
 
 Every component (router, rewriter, SQL agent, synthesizer) calls
 complete() or complete_json() here and never knows which provider
-actually served the request. Swapping providers or adding a third
-one is a one-file change.
+actually served the request. Swapping providers or adding a new one
+is a one-file change (and a config.py field).
 """
 from __future__ import annotations
 import json
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # ── Lazy client singletons ────────────────────────────────────────────────────
 
 _groq_client = None
+_openrouter_client = None
 _gemini_client = None
 
 
@@ -35,6 +36,19 @@ def _get_groq():
         from groq import Groq
         _groq_client = Groq(api_key=settings.groq_api_key)
     return _groq_client
+
+
+def _get_openrouter():
+    global _openrouter_client
+    if _openrouter_client is None:
+        if not settings.openrouter_api_key:
+            return None
+        from openai import OpenAI
+        _openrouter_client = OpenAI(
+            api_key=settings.openrouter_api_key,
+            base_url=settings.openrouter_base_url,
+        )
+    return _openrouter_client
 
 
 def _get_gemini():
@@ -68,6 +82,42 @@ def _groq_complete_json(system: str, user: str, max_tokens: int, temperature: fl
     client = _get_groq()
     resp = client.chat.completions.create(
         model=settings.groq_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        max_tokens=max_tokens,
+        temperature=temperature,
+        response_format={"type": "json_object"},
+    )
+    finish = resp.choices[0].finish_reason
+    text = resp.choices[0].message.content or ""
+    return text, finish
+
+
+def _openrouter_complete(system: str, user: str, max_tokens: int, temperature: float) -> str:
+    """OpenRouter uses an OpenAI-compatible API."""
+    client = _get_openrouter()
+    if client is None:
+        raise RuntimeError("OpenRouter not configured (OPENROUTER_API_KEY missing).")
+    resp = client.chat.completions.create(
+        model=settings.openrouter_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    return resp.choices[0].message.content or ""
+
+
+def _openrouter_complete_json(system: str, user: str, max_tokens: int, temperature: float) -> str:
+    client = _get_openrouter()
+    if client is None:
+        raise RuntimeError("OpenRouter not configured (OPENROUTER_API_KEY missing).")
+    resp = client.chat.completions.create(
+        model=settings.openrouter_model,
         messages=[
             {"role": "system", "content": system},
             {"role": "user",   "content": user},
@@ -120,9 +170,9 @@ def _gemini_complete_json(system: str, user: str, max_tokens: int, temperature: 
 
 
 def _is_rate_limit(exc: Exception) -> bool:
-    """Detect 429 from either provider without importing provider-specific types."""
+    """Detect 429/402 from any provider without importing provider-specific types."""
     msg = str(exc).lower()
-    return "429" in msg or "rate_limit" in msg or "resource_exhausted" in msg or "quota" in msg
+    return "429" in msg or "402" in msg or "rate_limit" in msg or "resource_exhausted" in msg or "quota" in msg or "insufficient" in msg or "payment" in msg
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -133,14 +183,24 @@ def complete(
     max_tokens: int = 1024,
     temperature: float = 0.0,
 ) -> str:
-    """Plain-text completion. Tries Groq first, falls back to Gemini on 429."""
+    """Plain-text completion. Tries Groq → OpenRouter → Gemini, falling back on 429."""
     try:
         result = _groq_complete(system, user, max_tokens, temperature)
         logger.debug("complete() served by Groq")
         return result
     except Exception as e:
         if _is_rate_limit(e):
-            logger.warning("Groq rate-limited, falling back to Gemini. (%s)", e)
+            logger.warning("Groq rate-limited, trying OpenRouter. (%s)", e)
+        else:
+            raise
+
+    try:
+        result = _openrouter_complete(system, user, max_tokens, temperature)
+        logger.debug("complete() served by OpenRouter")
+        return result
+    except Exception as e:
+        if _is_rate_limit(e):
+            logger.warning("OpenRouter rate-limited, falling back to Gemini. (%s)", e)
             return _gemini_complete(system, user, max_tokens, temperature)
         raise
 
@@ -152,8 +212,8 @@ def complete_json(
     temperature: float = 0.0,
 ) -> dict[str, Any]:
     """
-    JSON-mode completion. Tries Groq first, falls back to Gemini on 429.
-    Both providers have native JSON mode so malformed output is rare.
+    JSON-mode completion. Tries Groq → OpenRouter → Gemini, falling back on 429.
+    All three providers support JSON mode so malformed output is rare.
     Retries once with doubled token budget if output was truncated.
     """
     try:
@@ -162,7 +222,17 @@ def complete_json(
         return _parse(text, finish, system, user, max_tokens, temperature, provider="groq")
     except Exception as e:
         if _is_rate_limit(e):
-            logger.warning("Groq rate-limited, falling back to Gemini. (%s)", e)
+            logger.warning("Groq rate-limited, trying OpenRouter. (%s)", e)
+        else:
+            raise
+
+    try:
+        text, finish = _openrouter_complete_json(system, user, max_tokens, temperature)
+        logger.debug("complete_json() served by OpenRouter (finish=%s)", finish)
+        return _parse(text, finish, system, user, max_tokens, temperature, provider="openrouter")
+    except Exception as e:
+        if _is_rate_limit(e):
+            logger.warning("OpenRouter rate-limited, falling back to Gemini. (%s)", e)
             return _complete_json_gemini(system, user, max_tokens, temperature)
         raise
 
@@ -208,8 +278,9 @@ def _parse(
             logger.warning("[%s] Bad JSON (not truncation), retrying once.", provider)
             retry_user = user + "\n\nIMPORTANT: Return ONLY a valid JSON object. No other text."
 
-        if provider == "groq":
-            text2, finish2 = _groq_complete_json(system, retry_user, new_budget, temperature)
+        if provider in ("groq", "openrouter"):
+            text2, finish2 = _groq_complete_json(system, retry_user, new_budget, temperature) if provider == "groq" \
+                else _openrouter_complete_json(system, retry_user, new_budget, temperature)
         else:
             text2, finish2 = _gemini_complete_json(system, retry_user, new_budget, temperature)
 

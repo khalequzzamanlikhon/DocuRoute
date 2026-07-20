@@ -25,7 +25,13 @@ class Settings:
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
-    # --- Fallback LLM: Gemini (used only when Groq rate-limits) ---
+    # --- Secondary LLM: OpenRouter (kicks in when Groq rate-limits) ---
+    # Get free key at https://openrouter.ai/keys
+    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
+    openrouter_model: str = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct")
+    openrouter_base_url: str = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+
+    # --- Tertiary fallback LLM: Gemini (used when both Groq & OpenRouter fail) ---
     # Get free key at https://aistudio.google.com/apikey
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     llm_model: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")  # used by eval wrappers
@@ -54,6 +60,12 @@ class Settings:
     top_k_fused: int = _int("TOP_K_FUSED", 10)
     top_k_final: int = _int("TOP_K_FINAL", 5)
     rrf_k: int = _int("RRF_K", 60)  # standard RRF constant
+
+    # Pipeline mode — controls which retrieval stages are active.
+    #   "hybrid_rrf_rerank"   = BM25 + vector + RRF + cross-encoder reranker (full)
+    #   "hybrid_rrf"          = BM25 + vector + RRF, no reranker
+    #   "baseline_vector_only"= dense vector search only, no BM25, no reranker
+    retrieval_mode: str = os.getenv("RETRIEVAL_MODE", "hybrid_rrf_rerank")
 
     # Guardrails
     faithfulness_threshold: float = _float("FAITHFULNESS_THRESHOLD", 0.7)

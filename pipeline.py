@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from config import settings
 from generation.synthesizer import SynthesisResult, synthesize
 from ingestion.index_builder import get_table_schemas
 from retrieval.hybrid_retriever import HybridRetriever, RetrievedChunk
@@ -59,7 +60,18 @@ def answer_question(question: str, retriever: HybridRetriever) -> PipelineResult
         trace.query_variants = variants
         candidates = retriever.retrieve(variants)
         trace.retrieved_chunks = candidates
-        reranked = rerank(question, candidates)
+        if settings.retrieval_mode in ("hybrid_rrf", "baseline_vector_only"):
+            # Skip cross-encoder reranker — use top-k from RRF directly.
+            reranked = [
+                RankedChunk(
+                    chunk_id=c.chunk_id, doc_id=c.doc_id,
+                    page_number=c.page_number, text=c.text,
+                    rerank_score=1.0 - i / max(len(candidates), 1),
+                )
+                for i, c in enumerate(candidates[:settings.top_k_final])
+            ]
+        else:
+            reranked = rerank(question, candidates)
         trace.reranked_chunks = reranked
         trace.confidence_gate_passed = passes_confidence_gate(reranked)
         if not trace.confidence_gate_passed:

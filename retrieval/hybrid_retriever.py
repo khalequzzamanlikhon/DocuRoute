@@ -107,7 +107,7 @@ class HybridRetriever:
         rrf_scores: dict[str, float] = {}
         for q in queries:
             dense_hits = self._dense_search(q, top_k_each)
-            sparse_hits = self._sparse_search(q, top_k_each)
+            sparse_hits = self._sparse_search(q, top_k_each) if settings.retrieval_mode != "baseline_vector_only" else []
 
             for rank, (chunk_id, _) in enumerate(dense_hits):
                 rrf_scores[chunk_id] = rrf_scores.get(chunk_id, 0.0) + 1.0 / (k + rank + 1)
