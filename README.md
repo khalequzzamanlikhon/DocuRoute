@@ -23,7 +23,11 @@ its own quality with a full evaluation pipeline.
 
 ## Demo
 
-![DocuRoute Application Demo](demo.gif)
+<div align="center">
+
+<img src="demo.gif" alt="DocuRoute Application Demo" width="100%" style="max-width: 1100px;">
+
+</div>
 
 ---
 
