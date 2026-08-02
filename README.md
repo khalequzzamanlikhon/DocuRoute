@@ -332,7 +332,3 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-<div align="center">
-Built as a portfolio project demonstrating production ML engineering practices:<br>
-hybrid retrieval · agentic routing · grounded generation · automated evaluation
-</div>
