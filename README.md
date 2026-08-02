@@ -25,7 +25,7 @@ its own quality with a full evaluation pipeline.
 
 <div align="center">
 
-<img src="demo.gif" alt="DocuRoute Application Demo" width="100%" style="max-width: 1100px;">
+<img src="demo.gif" alt="DocuRoute Application Demo" width="55%" style="max-width: 650px;">
 
 </div>
 
@@ -41,7 +41,7 @@ its own quality with a full evaluation pipeline.
 | **Text-to-SQL Agent** | Generates and safely executes SQL against tables extracted from PDFs — sandboxed with read-only DuckDB, keyword denylist, and row cap |
 | **Grounded Generation** | Every factual sentence in an answer carries a `[C_n]` / `[T_n]` citation back to the specific chunk or SQL result that produced it |
 | **Provider Fallback** | Groq (primary) → OpenRouter (secondary) → Gemini (tertiary fallback). On rate-limit, automatically drops to the next provider — invisible to the user |
-| **Evaluation Harness** | Ragas metrics (Context Precision, Context Recall, Faithfulness, Answer Relevancy) against a golden set; DeepEval runs the same as a CI gate |
+| **Evaluation Harness** | Ragas-style metrics implemented in-house (Context Precision, Context Recall, Faithfulness, Answer Relevancy) against a golden set; DeepEval runs the same as a CI gate |
 
 ---
 
@@ -93,7 +93,7 @@ its own quality with a full evaluation pipeline.
 | **Primary LLM** | Groq — Llama 3.3 70B | Free tier, 14,400 req/day, GPT-4 class quality |
 | **Secondary LLM** | OpenRouter — Llama 3.3 70B | Auto-fallback on Groq rate-limit, higher quota |
 | **Fallback LLM** | Gemini 2.5 Flash | Auto-fallback when both Groq and OpenRouter are exhausted |
-| **Embeddings** | BGE-small-en-v1.5 (local) | Runs on CPU, no API key, no cost per query |
+| **Embeddings** | BGE-large-en-v1.5 (local) | Runs on CPU, no API key, no cost per query |
 | **Reranker** | BGE-reranker-base (local) | Cross-encoder accuracy, runs locally |
 | **Vector Store** | Qdrant (embedded mode) | On-disk, no Docker required for local dev |
 | **Keyword Search** | BM25 via rank-bm25 | Catches exact terms embeddings miss |
@@ -165,12 +165,24 @@ GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 LLM_MODEL=gemini-2.5-flash
 
 # ── Retrieval tuning (safe to leave as defaults) ──────────────────────────
-EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+# hybrid_rrf is the default — it measured BETTER than the reranker on this
+# corpus (see the Evaluation section). Opt into the reranker with:
+#   RETRIEVAL_MODE=hybrid_rrf_rerank
+RETRIEVAL_MODE=hybrid_rrf
+EMBEDDING_MODEL=BAAI/bge-large-en-v1.5
 RERANKER_MODEL=BAAI/bge-reranker-base
 TOP_K_DENSE=20
 TOP_K_SPARSE=20
 TOP_K_FUSED=10
 TOP_K_FINAL=5
+# Confidence gate (raw cross-encoder logits, see retrieval/reranker.py)
+MIN_RERANK_LOGIT=0.0
+MIN_RERANK_MARGIN=0.5
+
+# ── Semantic query cache (API layer only — eval always measures cold runs) ──
+CACHE_ENABLED=true
+CACHE_MAX_ENTRIES=256
+CACHE_SIMILARITY=0.97
 
 # ── Storage paths ─────────────────────────────────────────────────────────
 DUCKDB_PATH=./data/processed/tables.duckdb
@@ -230,6 +242,16 @@ Interactive API docs (Swagger UI):
 http://localhost:8000/docs
 ```
 
+Other endpoints:
+
+| Endpoint | Description |
+|---|---|
+| `POST /query` | Synchronous answer (JSON) |
+| `POST /query/stream` | Server-Sent Events: token-by-token answer, then the final JSON |
+| `GET /health` | Liveness + whether the index is loaded |
+| `GET /metrics` | In-process counters: requests, refusals, per-route, latencies, cache stats |
+| `GET /debug/tables` | Every table extracted into DuckDB, with column types |
+
 ### Step 4 — Start the UI (optional, separate terminal)
 
 ```bash
@@ -288,20 +310,30 @@ Answer Relevancy.
 
 ```bash
 # Edit evaluation/golden_set.json with real Q&A pairs first
-python run_eval.py --version hybrid_rrf_rerank
+python run_eval.py --version hybrid_rrf   # --version sets RETRIEVAL_MODE
 ```
 
 Results are appended to `evaluation/results/history.csv`. Run again after
 pipeline changes to build a before/after comparison.
 
-Measured on the 15-question Etsy golden set (`hybrid_rrf_rerank` vs. `hybrid_rrf`):
+Measured on the original 15-question Etsy golden set (before the refusal
+test cases were added) — full detail in `first_query_result.md`:
 
-| Metric | hybrid_rrf_rerank | hybrid_rrf | Δ |
+| Metric | hybrid_rrf (**default**) | hybrid_rrf_rerank | Δ |
 |---|---|---|---|
-| context_precision | 0.32 | 0.42 | +10pp |
-| context_recall | 0.33 | 0.41 | +8pp |
-| faithfulness | 0.77 | 0.93 | +16pp |
-| answer_relevancy | 0.69 | 0.79 | +10pp |
+| context_precision | **0.42** | 0.32 | −0.10 |
+| context_recall | **0.41** | 0.33 | −0.08 |
+| faithfulness | **0.93** | 0.77 | −0.16 |
+| answer_relevancy | **0.79** | 0.69 | −0.10 |
+
+> **Why `hybrid_rrf` is the default:** the project's own measurements show the
+> general-purpose reranker (BGE-reranker-base) *hurts* every metric on
+> financial/10-K text — a domain it wasn't trained on. Shipping the weaker
+> configuration by default was the #1 credibility issue found in the project
+> assessment, so the default flipped to plain hybrid RRF and the reranker is
+> now opt-in via `RETRIEVAL_MODE=hybrid_rrf_rerank`. The confidence gate was
+> also rewritten to use raw logits with a relative margin instead of the old
+> (near-random) absolute sigmoid threshold.
 
 ### CI regression gate
 
@@ -320,8 +352,10 @@ blocks merges if Faithfulness or Answer Relevancy drop below threshold.
 - [ ] Fine-tune the reranker on the golden set's hard negatives
 - [ ] Add multi-hop retrieval for questions requiring two linked lookups
 - [ ] Per-component latency tracing via Arize Phoenix surfaced in the UI
-- [ ] Query result caching to reduce LLM calls on repeated/similar questions
-- [ ] Streaming responses in the Streamlit UI
+- [x] Query result caching to reduce LLM calls on repeated/similar questions (semantic cache, API layer)
+- [x] Streaming responses in the Streamlit UI (SSE via `/query/stream`)
+- [x] Observability: per-stage latencies, request IDs, and a `/metrics` endpoint
+- [x] Lint/type gate (`ruff` + `mypy`) wired into CI
 - [ ] Support for HTML filings directly from EDGAR (skip Print-to-PDF step)
 
 ---
@@ -332,3 +366,6 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
+<div align="center">
+working to make better
+</div>
