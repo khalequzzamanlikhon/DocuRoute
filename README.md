@@ -15,7 +15,7 @@ financial questions to the right retrieval strategy — semantic search over
 document text, or a text-to-SQL agent against extracted tables — and measures
 its own quality with a full evaluation pipeline.
 
-[Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Usage](#usage) · [Scope](#scope--what-this-system-can-and-cant-answer) · [Evaluation](#evaluation) · [Roadmap](#roadmap)
+[Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Usage](#usage) · [Scope](#scope--what-this-system-can-and-cant-answer) · [Evaluation](#evaluation) 
 
 </div>
 
@@ -347,18 +347,6 @@ blocks merges if Faithfulness or Answer Relevancy drop below threshold.
 
 ---
 
-## Roadmap
-
-- [ ] Fine-tune the reranker on the golden set's hard negatives
-- [ ] Add multi-hop retrieval for questions requiring two linked lookups
-- [ ] Per-component latency tracing via Arize Phoenix surfaced in the UI
-- [x] Query result caching to reduce LLM calls on repeated/similar questions (semantic cache, API layer)
-- [x] Streaming responses in the Streamlit UI (SSE via `/query/stream`)
-- [x] Observability: per-stage latencies, request IDs, and a `/metrics` endpoint
-- [x] Lint/type gate (`ruff` + `mypy`) wired into CI
-- [ ] Support for HTML filings directly from EDGAR (skip Print-to-PDF step)
-
----
 
 ## License
 
