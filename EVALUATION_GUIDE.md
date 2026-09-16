@@ -23,9 +23,9 @@ The code now respects a `RETRIEVAL_MODE` env var (set in `config.py`):
 
 | Version | BM25 keyword | Dense vector | RRF fusion | Cross-encoder reranker |
 |---|---|---|---|---|
-| `baseline_vector_only` | ❌ | ✅ | ✅ | ❌ |
-| `hybrid_rrf` | ✅ | ✅ | ✅ | ❌ |
-| `hybrid_rrf_rerank` | ✅ | ✅ | ✅ | ✅ |
+| `baseline_vector_only` | no | yes | yes | no |
+| `hybrid_rrf` | yes | yes | yes | no |
+| `hybrid_rrf_rerank` | yes | yes | yes | yes |
 
 ---
 
@@ -38,9 +38,9 @@ cd D:\Projects\projects_july_26\GIT_FILE\DocuRoute
 .venv\Scripts\python run_eval.py --version hybrid_rrf_rerank
 ```
 
-> ⚠️ **Important**: Always use `.venv\Scripts\python` instead of just `python` — Hermes injects its own venv into `$PATH` and shadows the project's packages.
+>  **Important**: Always use `.venv\Scripts\python` instead of just `python` — Hermes injects its own venv into `$PATH` and shadows the project's packages.
 >
-> ⚠️ **Groq rate limits**: The free Groq tier rate-limits heavily (429s with auto-retry). If you see `Retrying request...` messages, that's normal — the script handles them automatically. Each question takes ~5–15 seconds. All 15 questions take **3–8 minutes**.
+>  **Groq rate limits**: The free Groq tier rate-limits heavily (429s with auto-retry). If you see `Retrying request...` messages, that's normal — the script handles them automatically. Each question takes ~5–15 seconds. All 15 questions take **3–8 minutes**.
 
 You'll see logging for each question:
 

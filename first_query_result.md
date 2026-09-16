@@ -25,8 +25,8 @@ There is no universal pass/fail — scores depend heavily on **domain difficulty
 |---|---|---|---|
 | **context_precision** | **0.42** | 0.50–0.70 | −0.08 from minimum |
 | **context_recall** | **0.41** | 0.50–0.70 | −0.09 from minimum |
-| **faithfulness** | **0.93** | 0.80–0.90 | ✅ Excellent — above target |
-| **answer_relevancy** | **0.79** | 0.75–0.90 | ✅ Good — in range |
+| **faithfulness** | **0.93** | 0.80–0.90 | yes Excellent — above target |
+| **answer_relevancy** | **0.79** | 0.75–0.90 | yes Good — in range |
 
 **Diagnosis**: The **retrieval side is the bottleneck** (precision + recall). The generation side (faithfulness + relevancy) is already strong. This means the LLM is doing a good job with what it gets — it just isn't getting enough of the right chunks.
 
@@ -132,12 +132,12 @@ This model:
 
 | Factor | Impact | Severity |
 |---|---|---|
-| **Domain mismatch** — general reranker on financial/10-K text | Reranker demotes relevant chunks | 🔴 High |
-| **Sigmoid normalization** — compresses all scores to near-0.15 range | Confidence gate becomes random | 🔴 High |
-| **Confidence gate wipes chunks** — SQL path loses text context | Faithfulness collapses on hybrid questions | 🔴 High |
-| **Small `top_k_final=5`** — halves candidates after reranker | Missing relevant chunks | 🟡 Medium |
-| **Scoring noise** — Gemini fallback produces malformed JSON during eval | Metric scores have ±5–10% noise | 🟡 Medium |
-| **Sentence_transformer version** — model file behavior varies by version | Hard to reproduce scores | 🟢 Low |
+| **Domain mismatch** — general reranker on financial/10-K text | Reranker demotes relevant chunks | High |
+| **Sigmoid normalization** — compresses all scores to near-0.15 range | Confidence gate becomes random | High |
+| **Confidence gate wipes chunks** — SQL path loses text context | Faithfulness collapses on hybrid questions | High |
+| **Small `top_k_final=5`** — halves candidates after reranker | Missing relevant chunks | Medium |
+| **Scoring noise** — Gemini fallback produces malformed JSON during eval | Metric scores have ±5–10% noise | Medium |
+| **Sentence_transformer version** — model file behavior varies by version | Hard to reproduce scores | Low |
 
 ---
 

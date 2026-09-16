@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔎 DocuRoute
+# DocuRoute
 
 ### Agentic, Query-Routing RAG System for Financial Document Intelligence
 
@@ -15,7 +15,7 @@ financial questions to the right retrieval strategy — semantic search over
 document text, or a text-to-SQL agent against extracted tables — and measures
 its own quality with a full evaluation pipeline.
 
-[Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Usage](#usage) · [Scope](#scope--what-this-system-can-and-cant-answer) · [Evaluation](#evaluation) 
+[Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Usage](#usage) · [Scope](#scope--what-this-system-can-and-cant-answer) · [Evaluation](#evaluation)
 
 </div>
 
@@ -49,25 +49,25 @@ its own quality with a full evaluation pipeline.
 
 ```
                           ┌─────────────────────────┐
-                          │       User Question      │
+                          │ User Question      │
                           └────────────┬────────────┘
                                        │
                           ┌────────────▼────────────┐
-                          │   LLM Query Router       │
-                          │  (grounded in real table │
-                          │   schemas from DuckDB)   │
+                          │ LLM Query Router       │
+                          │ (grounded in real table │
+                          │ schemas from DuckDB)   │
                           └──────┬──────────┬────────┘
                                  │          │
                ┌─────────────────▼──┐  ┌───▼──────────────────┐
-               │   UNSTRUCTURED     │  │    STRUCTURED         │
-               │   TEXT PATH        │  │    TABLE PATH         │
+               │ UNSTRUCTURED     │  │ STRUCTURED         │
+               │ TEXT PATH        │  │ TABLE PATH         │
                │                    │  │                       │
                │ Query Rewriter     │  │ Text-to-SQL Agent     │
                │       ↓            │  │       ↓               │
                │ Hybrid Retrieval   │  │ Sandboxed DuckDB      │
                │ (BM25 + Vector,    │  │ Execution             │
-               │  RRF fusion)       │  │ (read-only, denylisted│
-               │       ↓            │  │  row-capped)          │
+               │ RRF fusion)       │  │ (read-only, denylisted│
+               │       ↓            │  │ row-capped)          │
                │ Cross-Encoder      │  │       ↓               │
                │ Reranker           │  │ Structured Result     │
                └────────┬───────────┘  └───────────┬───────────┘
@@ -75,14 +75,14 @@ its own quality with a full evaluation pipeline.
                         └────────────┬──────────────┘
                                      │
                         ┌────────────▼────────────┐
-                        │  Grounded Synthesizer    │
-                        │  (refuses below          │
-                        │   confidence threshold)  │
+                        │ Grounded Synthesizer    │
+                        │ (refuses below          │
+                        │ confidence threshold)  │
                         └────────────┬────────────┘
                                      │
                         ┌────────────▼────────────┐
-                        │  Answer + [C_n]/[T_n]    │
-                        │  Citations               │
+                        │ Answer + [C_n]/[T_n]    │
+                        │ Citations               │
                         └─────────────────────────┘
 ```
 
@@ -167,7 +167,7 @@ LLM_MODEL=gemini-2.5-flash
 # ── Retrieval tuning (safe to leave as defaults) ──────────────────────────
 # hybrid_rrf is the default — it measured BETTER than the reranker on this
 # corpus (see the Evaluation section). Opt into the reranker with:
-#   RETRIEVAL_MODE=hybrid_rrf_rerank
+# RETRIEVAL_MODE=hybrid_rrf_rerank
 RETRIEVAL_MODE=hybrid_rrf
 EMBEDDING_MODEL=BAAI/bge-large-en-v1.5
 RERANKER_MODEL=BAAI/bge-reranker-base
